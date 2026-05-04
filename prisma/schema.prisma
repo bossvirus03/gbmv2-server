@@ -1,0 +1,86 @@
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrderStatus {
+  DEPOSIT
+  COMPLETED
+  CANCELLED
+}
+
+model Batch {
+  id              Int       @id @default(autoincrement())
+  name            String
+  jpyAmount       Decimal
+  exchangeRate    Decimal
+  domesticShipJpy Decimal
+  shippingToVn    Decimal
+  serviceFeeRate  Decimal
+  url             String?
+  products        Product[]
+}
+
+model Product {
+  id        Int         @id @default(autoincrement())
+  batchId   Int
+  batch     Batch       @relation(fields: [batchId], references: [id])
+  imageUrl  String
+  orderItems OrderItem[]
+  price    Decimal
+  status   ProductStatus @default(AVAILABLE)
+}
+
+model Customer {
+  id     Int     @id @default(autoincrement())
+  name   String
+  phone  String  @unique
+  orders Order[]
+}
+
+model Order {
+  id          Int         @id @default(autoincrement())
+  status      OrderStatus @default(DEPOSIT)
+  note        String?
+  customerId  Int
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  createdAt   DateTime    @default(now())
+  
+  items       OrderItem[]
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int
+  order     Order   @relation(fields: [orderId], references: [id])
+  
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  
+  price     Decimal
+  deposit   Decimal
+}
+
+model Expense {
+  id        Int      @id @default(autoincrement())
+  amount    Decimal
+  date      DateTime @default(now())
+  content   String
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  username String @unique
+  password String 
+}
+
+enum ProductStatus {
+  AVAILABLE
+  DEPOSIT
+  SOLD
+}
