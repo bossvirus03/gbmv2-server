@@ -78,7 +78,7 @@ export class BatchController {
 
   @Post(':id/products/uploads')
   @UseInterceptors(
-    FilesInterceptor('files', 10, {
+    FilesInterceptor('files', 50, {
       storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {

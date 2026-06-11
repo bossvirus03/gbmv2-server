@@ -9,6 +9,8 @@ import { UserModule } from './user/user.module';
 import { ProductModule } from './product/product.module';
 import { CustomerModule } from './customer/customer.module';
 import { OrderItemModule } from './order-item/order-item.module';
+import { CapitalModule } from './capital/capital.module';
+import { SettingModule } from './setting/setting.module';
 import { PrismaService } from './prisma.service';
 import { R2Service } from './r2.service';
 
@@ -22,6 +24,8 @@ import { R2Service } from './r2.service';
     ProductModule,
     CustomerModule,
     OrderItemModule,
+    CapitalModule,
+    SettingModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, R2Service],

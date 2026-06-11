@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Delete, Put, ParseIntPipe } from '@
 import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { CreateSellOrderDto } from './dto/create-sell-order.dto';
 
 @Controller('order')
 export class OrderController {
@@ -22,6 +23,11 @@ export class OrderController {
     return this.orderService.create(dto);
   }
 
+  @Post('sell')
+  createSellOrder(@Body() dto: CreateSellOrderDto) {
+    return this.orderService.createSellOrder(dto);
+  }
+
   @Put(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateOrderDto) {
     return this.orderService.update(id, dto);
@@ -32,3 +38,4 @@ export class OrderController {
     return this.orderService.remove(id);
   }
 }
+

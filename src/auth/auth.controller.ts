@@ -5,13 +5,9 @@ import { AuthService } from './auth.service';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('login')
-  async login(@Body() body: { username: string; password: string }) {
-    return this.authService.login(body.username, body.password);
-  }
-
-  @Post('signup')
-  async signUp(@Body() body: { username: string; password: string }) {
-    return this.authService.signUp(body.username, body.password);
+  @Post('google')
+  async loginWithGoogle(@Body() body: { credential: string }) {
+    return this.authService.loginWithGoogle(body.credential);
   }
 }
+

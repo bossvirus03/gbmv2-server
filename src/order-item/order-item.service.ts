@@ -8,7 +8,16 @@ export class OrderItemService {
   constructor(private prisma: PrismaService) {}
 
   findAll() {
-    return this.prisma.orderItem.findMany({ include: { order: true, product: true } });
+    return this.prisma.orderItem.findMany({
+      include: {
+        order: {
+          include: {
+            customer: true
+          }
+        },
+        product: true
+      }
+    });
   }
 
   findOne(id: number) {

@@ -8,6 +8,8 @@ datasource db {
   provider = "postgresql"
 }
 
+
+
 enum OrderStatus {
   DEPOSIT
   COMPLETED
@@ -74,13 +76,32 @@ model Expense {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  username String @unique
-  password String 
+  id       Int     @id @default(autoincrement())
+  username String  @unique
+  password String? 
+  email    String? @unique
+  avatar   String?
 }
+
+
 
 enum ProductStatus {
   AVAILABLE
   DEPOSIT
   SOLD
+}
+
+model Capital {
+  id        Int      @id @default(autoincrement())
+  amount    Decimal
+  date      DateTime @default(now())
+  content   String
+}
+
+model Setting {
+  id                  Int     @id @default(1)
+  shippingVnPerKg     Decimal @default(0)
+  exchangeRate        Decimal @default(0)
+  domesticShippingJpy Decimal @default(0)
+  serviceFeeRate      Decimal @default(0)
 }
