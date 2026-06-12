@@ -33,6 +33,27 @@ export class BatchService {
     return this.prisma.batch.delete({ where: { id } });
   }
 
+  async removeProduct(productId: number) {
+    // Lấy thông tin sản phẩm để lấy imageUrl trước khi xóa
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { imageUrl: true },
+    });
+
+    // Xóa ảnh trên Cloudflare R2 nếu có
+    if (product?.imageUrl) {
+      try {
+        await this.r2Service.deleteByUrl(product.imageUrl);
+      } catch (err) {
+        // Log lỗi nhưng không block việc xóa DB
+        console.error(`[R2] Không thể xóa ảnh: ${product.imageUrl}`, err);
+      }
+    }
+
+    return this.prisma.product.delete({ where: { id: productId } });
+  }
+
+
   async addProduct(batchId: number, dto: CreateProductDto) {
     return this.prisma.product.create({ data: { ...dto, batchId, price: 0 } });
   }

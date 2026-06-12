@@ -56,11 +56,19 @@ export class BatchController {
     return this.batchService.addProduct(id, dto);
   }
 
+  @Delete(':id/products/:productId')
+  removeProduct(
+    @Param('id', ParseIntPipe) _id: number,
+    @Param('productId', ParseIntPipe) productId: number,
+  ) {
+    return this.batchService.removeProduct(productId);
+  }
+
   @Post(':id/products/upload')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 },
+      limits: { fileSize: 50 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype?.startsWith('image/')) {
           return cb(new BadRequestException('Only image files are allowed'), false);
@@ -80,7 +88,7 @@ export class BatchController {
   @UseInterceptors(
     FilesInterceptor('files', 50, {
       storage: memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024 },
+      limits: { fileSize: 50 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype?.startsWith('image/')) {
           return cb(new BadRequestException('Only image files are allowed'), false);
