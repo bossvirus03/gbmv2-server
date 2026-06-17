@@ -6,88 +6,154 @@ import { CreateSellOrderDto } from './dto/create-sell-order.dto';
 
 @Injectable()
 export class OrderService {
-	constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-	findAll() {
-		return this.prisma.order.findMany();
-	}
+  findAll() {
+    return this.prisma.order.findMany();
+  }
 
-	findOne(id: number) {
-		return this.prisma.order.findUnique({ where: { id } });
-	}
+  findOne(id: number) {
+    return this.prisma.order.findUnique({ where: { id } });
+  }
 
-	create(dto: CreateOrderDto) {
-		return this.prisma.order.create({ data: dto });
-	}
+  async create(dto: CreateOrderDto) {
+    const { customerId, note, items, status } = dto;
 
-	async createSellOrder(dto: CreateSellOrderDto) {
-		const { customerName, customerPhone, productId, price, deposit, status, note } = dto;
+    let orderStatus: 'DEPOSIT' | 'COMPLETED' = 'DEPOSIT';
+    if (status) {
+      orderStatus = status as any;
+    } else if (items && items.length > 0) {
+      const allCompleted = items.every(
+        (item) => Number(item.deposit) >= Number(item.price),
+      );
+      orderStatus = allCompleted ? 'COMPLETED' : 'DEPOSIT';
+    }
 
-		let customer;
-		if (customerPhone) {
-			customer = await this.prisma.customer.findUnique({
-				where: { phone: customerPhone },
-			});
-		}
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
+        data: {
+          customerId,
+          status: orderStatus,
+          note: note || null,
+        },
+      });
 
-		if (customer) {
-			if (customer.name !== customerName) {
-				customer = await this.prisma.customer.update({
-					where: { id: customer.id },
-					data: { name: customerName },
-				});
-			}
-		} else {
-			const phoneValue = customerPhone || `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-			customer = await this.prisma.customer.create({
-				data: {
-					name: customerName,
-					phone: phoneValue,
-				},
-			});
-		}
+      if (items && items.length > 0) {
+        for (const item of items) {
+          await tx.orderItem.create({
+            data: {
+              orderId: order.id,
+              productId: item.productId,
+              price: item.price,
+              deposit: item.deposit,
+            },
+          });
 
-		const isSold = status === 'SOLD';
-		const orderStatus = isSold ? 'COMPLETED' : 'DEPOSIT';
-		const productStatus = status || (Number(deposit || 0) >= Number(price) ? 'SOLD' : 'DEPOSIT');
+          const productStatus =
+            Number(item.deposit) >= Number(item.price) ? 'SOLD' : 'DEPOSIT';
 
-		const order = await this.prisma.order.create({
-			data: {
-				customerId: customer.id,
-				status: orderStatus as any,
-				note: note || null,
-			},
-		});
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              status: productStatus as any,
+              price: item.price,
+            },
+          });
+        }
+      }
 
-		const orderItem = await this.prisma.orderItem.create({
-			data: {
-				orderId: order.id,
-				productId: productId,
-				price: price,
-				deposit: isSold ? price : Number(deposit || 0),
-			},
-		});
+      return tx.order.findUnique({
+        where: { id: order.id },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          customer: true,
+        },
+      });
+    });
+  }
 
-		await this.prisma.product.update({
-			where: { id: productId },
-			data: {
-				status: productStatus as any,
-				price: price,
-			},
-		});
+  async createSellOrder(dto: CreateSellOrderDto) {
+    const {
+      customerName,
+      customerPhone,
+      productId,
+      price,
+      deposit,
+      status,
+      note,
+    } = dto;
 
-		return {
-			...order,
-			items: [orderItem],
-		};
-	}
+    let customer;
+    if (customerPhone) {
+      customer = await this.prisma.customer.findUnique({
+        where: { phone: customerPhone },
+      });
+    }
 
-	update(id: number, dto: UpdateOrderDto) {
-		return this.prisma.order.update({ where: { id }, data: dto });
-	}
+    if (customer) {
+      if (customer.name !== customerName) {
+        customer = await this.prisma.customer.update({
+          where: { id: customer.id },
+          data: { name: customerName },
+        });
+      }
+    } else {
+      const phoneValue =
+        customerPhone ||
+        `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      customer = await this.prisma.customer.create({
+        data: {
+          name: customerName,
+          phone: phoneValue,
+        },
+      });
+    }
 
-	remove(id: number) {
-		return this.prisma.order.delete({ where: { id } });
-	}
+    const isSold = status === 'SOLD';
+    const orderStatus = isSold ? 'COMPLETED' : 'DEPOSIT';
+    const productStatus =
+      status || (Number(deposit || 0) >= Number(price) ? 'SOLD' : 'DEPOSIT');
+
+    const order = await this.prisma.order.create({
+      data: {
+        customerId: customer.id,
+        status: orderStatus as any,
+        note: note || null,
+      },
+    });
+
+    const orderItem = await this.prisma.orderItem.create({
+      data: {
+        orderId: order.id,
+        productId: productId,
+        price: price,
+        deposit: isSold ? price : Number(deposit || 0),
+      },
+    });
+
+    await this.prisma.product.update({
+      where: { id: productId },
+      data: {
+        status: productStatus as any,
+        price: price,
+      },
+    });
+
+    return {
+      ...order,
+      items: [orderItem],
+    };
+  }
+
+  update(id: number, dto: UpdateOrderDto) {
+    return this.prisma.order.update({ where: { id }, data: dto as any });
+  }
+
+  remove(id: number) {
+    return this.prisma.order.delete({ where: { id } });
+  }
 }
-
