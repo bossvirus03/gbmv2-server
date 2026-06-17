@@ -3,12 +3,11 @@ import { PrismaService } from '../prisma.service';
 import { CreateBatchDto } from './dto/create-batch.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateBatchDto } from './dto/update-batch.dto';
-// import { cloudinary } from '../cloudinary/cloudinary';
 import { R2Service } from 'src/r2.service';
 
 @Injectable()
 export class BatchService {
-  constructor(private prisma: PrismaService, private r2Service: R2Service) {}
+  constructor(private prisma: PrismaService, private r2Service: R2Service) { }
 
   findAll() {
     return this.prisma.batch.findMany({ include: { products: true } });
@@ -66,8 +65,8 @@ export class BatchService {
     const imageUrl = await this.r2Service.upload(file, batchId);
 
     return this.prisma.product.create({
-      data: { 
-        imageUrl, 
+      data: {
+        imageUrl,
         batchId,
         price: 0,
       },
