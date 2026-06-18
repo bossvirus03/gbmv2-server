@@ -10,7 +10,6 @@ import sharp from 'sharp';
 @Injectable()
 export class R2Service {
   private client: S3Client;
-  private readonly logger = new Logger(R2Service.name);
 
   constructor() {
     this.client = new S3Client({
@@ -27,14 +26,16 @@ export class R2Service {
    * Nén ảnh bằng sharp: resize tối đa 800px, chuyển sang WebP chất lượng 80
    * Giảm 60-80% dung lượng so với ảnh gốc (JPEG/PNG)
    */
-  async compressImage(buffer: Buffer): Promise<{ buffer: Buffer; contentType: string }> {
+  async compressImage(
+    buffer: Buffer,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
     const compressed = await sharp(buffer)
       .rotate() // Tự động xoay theo EXIF metadata (quan trọng cho ảnh chụp từ điện thoại)
       .resize(800, 800, {
-        fit: 'inside',           // Giữ nguyên tỷ lệ, không crop
+        fit: 'inside', // Giữ nguyên tỷ lệ, không crop
         withoutEnlargement: true, // Không phóng to ảnh nhỏ hơn 800px
       })
-      .webp({ quality: 80 })    // Chuyển sang WebP - nén tốt hơn JPEG 30-40%
+      .webp({ quality: 80 }) // Chuyển sang WebP - nén tốt hơn JPEG 30-40%
       .toBuffer();
 
     return { buffer: compressed, contentType: 'image/webp' };
@@ -53,7 +54,9 @@ export class R2Service {
     const random = Math.random().toString(36).substring(2, 8);
     const key = `images/batches/${batchId}/${timestamp}-${random}.webp`;
 
-    const { buffer: compressedBuffer, contentType } = await this.compressImage(file.buffer);
+    const { buffer: compressedBuffer, contentType } = await this.compressImage(
+      file.buffer,
+    );
 
     await this.client.send(
       new PutObjectCommand({
@@ -92,7 +95,11 @@ export class R2Service {
   /**
    * Upload một buffer trực tiếp lên R2 với key cho trước
    */
-  async uploadBuffer(key: string, buffer: Buffer, contentType: string): Promise<string> {
+  async uploadBuffer(
+    key: string,
+    buffer: Buffer,
+    contentType: string,
+  ): Promise<string> {
     await this.client.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET,
