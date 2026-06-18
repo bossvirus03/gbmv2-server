@@ -1,14 +1,14 @@
 import { IsNotEmpty, IsNumber, IsString, IsOptional, IsDateString } from 'class-validator';
 
-export class CreateExpenseDto {
+export class CreateCapitalDto {
   @IsNumber()
   amount: number;
-
-  @IsString()
-  @IsNotEmpty()
-  content: string;
 
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  content: string;
 }

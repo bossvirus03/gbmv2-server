@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { CreateCapitalDto } from './dto/create-capital.dto';
+import { UpdateCapitalDto } from './dto/update-capital.dto';
 
 @Injectable()
 export class CapitalService {
@@ -17,7 +19,7 @@ export class CapitalService {
     });
   }
 
-  async create(data: { amount: number; date?: string | Date; content: string }) {
+  async create(data: CreateCapitalDto) {
     return this.prisma.capital.create({
       data: {
         amount: data.amount,
@@ -27,11 +29,12 @@ export class CapitalService {
     });
   }
 
-  async update(id: number, data: { amount?: number; date?: string | Date; content?: string }) {
+  async update(id: number, data: UpdateCapitalDto) {
     return this.prisma.capital.update({
       where: { id },
       data: {
-        ...data,
+        amount: data.amount,
+        content: data.content,
         date: data.date ? new Date(data.date) : undefined,
       },
     });

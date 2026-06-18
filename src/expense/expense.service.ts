@@ -16,11 +16,24 @@ export class ExpenseService {
 	}
 
 	create(dto: CreateExpenseDto) {
-		return this.prisma.expense.create({ data: dto });
+		return this.prisma.expense.create({
+			data: {
+				amount: dto.amount,
+				content: dto.content,
+				date: dto.date ? new Date(dto.date) : new Date(),
+			}
+		});
 	}
 
 	update(id: number, dto: UpdateExpenseDto) {
-		return this.prisma.expense.update({ where: { id }, data: dto });
+		return this.prisma.expense.update({
+			where: { id },
+			data: {
+				amount: dto.amount,
+				content: dto.content,
+				date: dto.date ? new Date(dto.date) : undefined,
+			}
+		});
 	}
 
 	remove(id: number) {

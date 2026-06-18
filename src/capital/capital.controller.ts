@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe } from '@nestjs/common';
 import { CapitalService } from './capital.service';
+import { CreateCapitalDto } from './dto/create-capital.dto';
+import { UpdateCapitalDto } from './dto/update-capital.dto';
 
 @Controller('capital')
 export class CapitalController {
@@ -16,14 +18,14 @@ export class CapitalController {
   }
 
   @Post()
-  async create(@Body() body: { amount: number; date?: string; content: string }) {
+  async create(@Body() body: CreateCapitalDto) {
     return this.capitalService.create(body);
   }
 
   @Put(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { amount?: number; date?: string; content?: string },
+    @Body() body: UpdateCapitalDto,
   ) {
     return this.capitalService.update(id, body);
   }
