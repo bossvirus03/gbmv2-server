@@ -79,10 +79,16 @@ export class BatchService {
       throw new BadRequestException('Image files are required');
     }
 
-    // Upload song song
-    const imageUrls = await Promise.all(
-      files.map((file) => this.r2Service.upload(file, batchId)),
-    );
+    const imageUrls: string[] = [];
+    const chunkSize = 2;
+
+    for (let i = 0; i < files.length; i += chunkSize) {
+      const chunk = files.slice(i, i + chunkSize);
+      const urls = await Promise.all(
+        chunk.map((file) => this.r2Service.upload(file, batchId)),
+      );
+      imageUrls.push(...urls);
+    }
 
     const data = imageUrls.map((imageUrl) => ({
       imageUrl,
