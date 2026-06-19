@@ -45,6 +45,8 @@ export class R2Service {
    * Upload file vào folder: images/batches/[batchId]/
    * Tự động nén ảnh trước khi upload
    */
+  private readonly logger = new Logger(R2Service.name);
+
   async upload(file: Express.Multer.File, batchId: number): Promise<string> {
     if (!batchId) {
       throw new Error('batchId is required for upload');
@@ -54,21 +56,30 @@ export class R2Service {
     const random = Math.random().toString(36).substring(2, 8);
     const key = `images/batches/${batchId}/${timestamp}-${random}.webp`;
 
-    const { buffer: compressedBuffer, contentType } = await this.compressImage(
-      file.buffer,
-    );
+    try {
+      this.logger.log(`[R2] Bắt đầu nén ảnh: ${file.originalname || 'file'}`);
+      const { buffer: compressedBuffer, contentType } = await this.compressImage(
+        file.buffer,
+      );
+      this.logger.log(`[R2] Nén ảnh thành công. Kích thước sau nén: ${compressedBuffer.length} bytes`);
 
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET,
-        Key: key,
-        Body: compressedBuffer,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=31536000, immutable',
-      }),
-    );
+      this.logger.log(`[R2] Đang upload lên bucket ${process.env.R2_BUCKET} với key: ${key}`);
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET,
+          Key: key,
+          Body: compressedBuffer,
+          ContentType: contentType,
+          CacheControl: 'public, max-age=31536000, immutable',
+        }),
+      );
+      this.logger.log(`[R2] Upload thành công lên R2`);
 
-    return `${process.env.R2_PUBLIC_URL}/${key}`;
+      return `${process.env.R2_PUBLIC_URL}/${key}`;
+    } catch (error: any) {
+      this.logger.error(`[R2] Lỗi trong quá trình xử lý/tải lên file ${file.originalname || 'file'}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   /**
