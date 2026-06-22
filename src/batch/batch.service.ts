@@ -62,6 +62,9 @@ export class BatchService {
     if (!file?.buffer) {
       throw new BadRequestException('Image file is required');
     }
+    if (!file.mimetype?.startsWith('image/')) {
+      throw new BadRequestException('Only image files are allowed');
+    }
 
     const imageUrl = await this.r2Service.upload(file, batchId);
 
@@ -82,6 +85,13 @@ export class BatchService {
 
     if (!files?.length) {
       throw new BadRequestException('Image files are required');
+    }
+
+    // Kiểm tra định dạng file ảnh
+    for (const file of files) {
+      if (!file.mimetype?.startsWith('image/')) {
+        throw new BadRequestException('Only image files are allowed');
+      }
     }
 
     const imageUrls: string[] = [];

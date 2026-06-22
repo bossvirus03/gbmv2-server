@@ -22,9 +22,9 @@ import { UpdateBatchDto } from './dto/update-batch.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('batch')
-@UseGuards(JwtAuthGuard)
+// @UseGuards(JwtAuthGuard)
 export class BatchController {
-  constructor(private readonly batchService: BatchService) {}
+  constructor(private readonly batchService: BatchService) { }
 
   @Get()
   findAll() {
@@ -69,12 +69,6 @@ export class BatchController {
     FileInterceptor('file', {
       storage: memoryStorage(),
       limits: { fileSize: 50 * 1024 * 1024 },
-      fileFilter: (_req, file, cb) => {
-        if (!file.mimetype?.startsWith('image/')) {
-          return cb(new BadRequestException('Only image files are allowed'), false);
-        }
-        return cb(null, true);
-      },
     }),
   )
   addProductWithUpload(
@@ -89,12 +83,6 @@ export class BatchController {
     FilesInterceptor('files', 50, {
       storage: memoryStorage(),
       limits: { fileSize: 50 * 1024 * 1024 },
-      fileFilter: (_req, file, cb) => {
-        if (!file.mimetype?.startsWith('image/')) {
-          return cb(new BadRequestException('Only image files are allowed'), false);
-        }
-        return cb(null, true);
-      },
     }),
   )
   addProductsWithUploads(
