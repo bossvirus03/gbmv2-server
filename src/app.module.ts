@@ -13,6 +13,7 @@ import { CapitalModule } from './capital/capital.module';
 import { SettingModule } from './setting/setting.module';
 import { PrismaService } from './prisma.service';
 import { R2Service } from './r2.service';
+import { LogModule } from './log/log.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { R2Service } from './r2.service';
     OrderItemModule,
     CapitalModule,
     SettingModule,
+    LogModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, R2Service],
