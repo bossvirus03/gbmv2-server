@@ -36,7 +36,7 @@ export class OrderService {
   }
 
   async create(dto: CreateOrderDto) {
-    const { customerId, note, items, status } = dto;
+    const { customerId, note, items, status, createdAt } = dto;
 
     let orderStatus: 'DEPOSIT' | 'COMPLETED' = 'DEPOSIT';
     if (status) {
@@ -54,6 +54,7 @@ export class OrderService {
           customerId,
           status: orderStatus,
           note: note || null,
+          ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
         },
       });
 

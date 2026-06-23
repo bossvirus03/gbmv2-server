@@ -29,4 +29,8 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  @IsString()
+  @IsOptional()
+  createdAt?: string;
 }
