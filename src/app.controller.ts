@@ -1,14 +1,36 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { AppService } from './app.service';
+import { R2Service } from './r2.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly r2Service: R2Service,
+  ) {}
 
   @Get()
   getHello(): string {
     return this.appService.getHello();
+  }
+
+  @Get('r2/storage')
+  async getR2Storage(@Query('refresh') refresh?: string) {
+    const forceRefresh = refresh === 'true';
+    const usedBytes = await this.r2Service.getStorageStats(forceRefresh);
+    const maxGb = process.env.R2_MAX_SIZE_GB ? parseFloat(process.env.R2_MAX_SIZE_GB) : 10;
+    const totalBytes = maxGb * 1024 * 1024 * 1024;
+    const remainingBytes = Math.max(0, totalBytes - usedBytes);
+    const usedPercentage = parseFloat(((usedBytes / totalBytes) * 100).toFixed(2));
+
+    return {
+      usedBytes,
+      totalBytes,
+      remainingBytes,
+      usedPercentage,
+      maxGb,
+    };
   }
 
   @Get('proxy-download')

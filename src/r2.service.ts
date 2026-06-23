@@ -4,12 +4,18 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
 
 @Injectable()
 export class R2Service {
   private client: S3Client;
+  private storageCache: {
+    totalSize: number;
+    updatedAt: number;
+  } | null = null;
+  private readonly CACHE_TTL = 300000; // 5 minutes
 
   constructor() {
     this.client = new S3Client({
@@ -153,6 +159,56 @@ export class R2Service {
       return new URL(imageUrl).pathname.replace(/^\//, '');
     } catch {
       throw new Error(`URL không hợp lệ: ${imageUrl}`);
+    }
+  }
+
+  /**
+   * Tính toán tổng dung lượng của tất cả đối tượng trong bucket R2
+   */
+  async getStorageStats(forceRefresh = false): Promise<number> {
+    const now = Date.now();
+    if (!forceRefresh && this.storageCache && (now - this.storageCache.updatedAt < this.CACHE_TTL)) {
+      this.logger.log(`[R2] Sử dụng dung lượng từ cache: ${this.storageCache.totalSize} bytes`);
+      return this.storageCache.totalSize;
+    }
+
+    this.logger.log(`[R2] Bắt đầu quét bucket ${process.env.R2_BUCKET} để tính dung lượng...`);
+    let totalSize = 0;
+    let isTruncated = true;
+    let continuationToken: string | undefined = undefined;
+
+    try {
+      while (isTruncated) {
+        const response = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: process.env.R2_BUCKET,
+            ContinuationToken: continuationToken,
+          }),
+        );
+
+        if (response.Contents) {
+          for (const obj of response.Contents) {
+            totalSize += obj.Size || 0;
+          }
+        }
+
+        isTruncated = response.IsTruncated || false;
+        continuationToken = response.NextContinuationToken;
+      }
+
+      this.storageCache = {
+        totalSize,
+        updatedAt: now,
+      };
+      this.logger.log(`[R2] Tính toán dung lượng thành công: ${totalSize} bytes`);
+      return totalSize;
+    } catch (error: any) {
+      this.logger.error(`[R2] Lỗi khi quét dung lượng bucket: ${error.message}`, error.stack);
+      if (this.storageCache) {
+        this.logger.warn(`[R2] Trả về dữ liệu cache cũ do gặp lỗi`);
+        return this.storageCache.totalSize;
+      }
+      throw error;
     }
   }
 }
