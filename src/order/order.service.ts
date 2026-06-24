@@ -115,22 +115,16 @@ export class OrderService {
 
     let customer;
     if (customerPhone) {
-      customer = await this.prisma.customer.findUnique({
+      customer = await this.prisma.customer.upsert({
         where: { phone: customerPhone },
+        update: { name: customerName },
+        create: {
+          name: customerName,
+          phone: customerPhone,
+        },
       });
-    }
-
-    if (customer) {
-      if (customer.name !== customerName) {
-        customer = await this.prisma.customer.update({
-          where: { id: customer.id },
-          data: { name: customerName },
-        });
-      }
     } else {
-      const phoneValue =
-        customerPhone ||
-        `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const phoneValue = `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       customer = await this.prisma.customer.create({
         data: {
           name: customerName,

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
@@ -15,11 +15,25 @@ export class CustomerService {
     return this.prisma.customer.findUnique({ where: { id }, include: { orders: true } });
   }
 
-  create(dto: CreateCustomerDto) {
+  async create(dto: CreateCustomerDto) {
+    const existing = await this.prisma.customer.findUnique({
+      where: { phone: dto.phone },
+    });
+    if (existing) {
+      throw new ConflictException('Số điện thoại đã tồn tại trong hệ thống.');
+    }
     return this.prisma.customer.create({ data: dto });
   }
 
-  update(id: number, dto: UpdateCustomerDto) {
+  async update(id: number, dto: UpdateCustomerDto) {
+    if (dto.phone) {
+      const existing = await this.prisma.customer.findUnique({
+        where: { phone: dto.phone },
+      });
+      if (existing && existing.id !== id) {
+        throw new ConflictException('Số điện thoại đã tồn tại trong hệ thống.');
+      }
+    }
     return this.prisma.customer.update({ where: { id }, data: dto });
   }
 
