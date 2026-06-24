@@ -12,7 +12,21 @@ export class ProductService {
   }
 
   findOne(id: number) {
-    return this.prisma.product.findUnique({ where: { id }, include: { batch: true } });
+    return this.prisma.product.findUnique({
+      where: { id },
+      include: {
+        batch: true,
+        orderItems: {
+          include: {
+            order: {
+              include: {
+                customer: true,
+              },
+            },
+          },
+        },
+      },
+    });
   }
 
   create(dto: CreateProductDto) {

@@ -33,4 +33,8 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   createdAt?: string;
+
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string;
 }

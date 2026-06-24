@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
@@ -35,8 +35,23 @@ export class OrderService {
     });
   }
 
+  // In-memory idempotency cache: lưu kết quả tạo đơn trong 30 giây
+  // để tránh tạo đơn trùng lặp khi user nhấn submit nhiều lần
+  private idempotencyCache = new Map<
+    string,
+    { data: any; expiresAt: number }
+  >();
+
   async create(dto: CreateOrderDto) {
-    const { customerId, note, items, status, createdAt } = dto;
+    const { customerId, note, items, status, createdAt, idempotencyKey } = dto;
+
+    // Kiểm tra idempotency key để tránh double-submit
+    if (idempotencyKey) {
+      const cached = this.idempotencyCache.get(idempotencyKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.data;
+      }
+    }
 
     let orderStatus: 'DEPOSIT' | 'COMPLETED' = 'DEPOSIT';
     if (status) {
@@ -48,7 +63,7 @@ export class OrderService {
       orderStatus = allCompleted ? 'COMPLETED' : 'DEPOSIT';
     }
 
-    return this.prisma.$transaction(
+    const result = await this.prisma.$transaction(
       async (tx) => {
         const order = await tx.order.create({
           data: {
@@ -61,6 +76,23 @@ export class OrderService {
 
         if (items && items.length > 0) {
           for (const item of items) {
+            // Kiểm tra sản phẩm có đang thuộc đơn hàng active không
+            const conflictItem = await tx.orderItem.findFirst({
+              where: {
+                productId: item.productId,
+                order: {
+                  status: { in: ['DEPOSIT', 'COMPLETED'] },
+                },
+              },
+              include: { order: true },
+            });
+
+            if (conflictItem) {
+              throw new BadRequestException(
+                `Sản phẩm #${item.productId} đã có trong đơn hàng #${conflictItem.orderId} (${conflictItem.order.status}). Không thể tạo đơn mới cho mặt hàng đang có giao dịch.`,
+              );
+            }
+
             await tx.orderItem.create({
               data: {
                 orderId: order.id,
@@ -100,6 +132,23 @@ export class OrderService {
         timeout: 30000,
       },
     );
+
+    // Lưu kết quả vào cache idempotency (TTL: 30 giây)
+    if (idempotencyKey) {
+      this.idempotencyCache.set(idempotencyKey, {
+        data: result,
+        expiresAt: Date.now() + 30_000,
+      });
+
+      // Dọn dẹp cache hết hạn để tránh memory leak
+      for (const [key, value] of this.idempotencyCache.entries()) {
+        if (value.expiresAt <= Date.now()) {
+          this.idempotencyCache.delete(key);
+        }
+      }
+    }
+
+    return result;
   }
 
   async createSellOrder(dto: CreateSellOrderDto) {
@@ -137,6 +186,23 @@ export class OrderService {
     const orderStatus = isSold ? 'COMPLETED' : 'DEPOSIT';
     const productStatus =
       status || (Number(deposit || 0) >= Number(price) ? 'SOLD' : 'DEPOSIT');
+
+    // Kiểm tra sản phẩm có đang thuộc đơn hàng active không
+    const conflictItem = await this.prisma.orderItem.findFirst({
+      where: {
+        productId,
+        order: {
+          status: { in: ['DEPOSIT', 'COMPLETED'] },
+        },
+      },
+      include: { order: true },
+    });
+
+    if (conflictItem) {
+      throw new BadRequestException(
+        `Sản phẩm #${productId} đã có trong đơn hàng #${conflictItem.orderId} (${conflictItem.order.status}). Không thể tạo đơn mới cho mặt hàng đang có giao dịch.`,
+      );
+    }
 
     const order = await this.prisma.order.create({
       data: {
