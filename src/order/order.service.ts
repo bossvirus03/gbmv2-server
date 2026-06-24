@@ -48,52 +48,58 @@ export class OrderService {
       orderStatus = allCompleted ? 'COMPLETED' : 'DEPOSIT';
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.create({
-        data: {
-          customerId,
-          status: orderStatus,
-          note: note || null,
-          ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
-        },
-      });
-
-      if (items && items.length > 0) {
-        for (const item of items) {
-          await tx.orderItem.create({
-            data: {
-              orderId: order.id,
-              productId: item.productId,
-              price: item.price,
-              deposit: item.deposit,
-            },
-          });
-
-          const productStatus =
-            Number(item.deposit) >= Number(item.price) ? 'SOLD' : 'DEPOSIT';
-
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              status: productStatus as any,
-              price: item.price,
-            },
-          });
-        }
-      }
-
-      return tx.order.findUnique({
-        where: { id: order.id },
-        include: {
-          items: {
-            include: {
-              product: true,
-            },
+    return this.prisma.$transaction(
+      async (tx) => {
+        const order = await tx.order.create({
+          data: {
+            customerId,
+            status: orderStatus,
+            note: note || null,
+            ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
           },
-          customer: true,
-        },
-      });
-    });
+        });
+
+        if (items && items.length > 0) {
+          for (const item of items) {
+            await tx.orderItem.create({
+              data: {
+                orderId: order.id,
+                productId: item.productId,
+                price: item.price,
+                deposit: item.deposit,
+              },
+            });
+
+            const productStatus =
+              Number(item.deposit) >= Number(item.price) ? 'SOLD' : 'DEPOSIT';
+
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                status: productStatus as any,
+                price: item.price,
+              },
+            });
+          }
+        }
+
+        return tx.order.findUnique({
+          where: { id: order.id },
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            customer: true,
+          },
+        });
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      },
+    );
   }
 
   async createSellOrder(dto: CreateSellOrderDto) {
@@ -172,92 +178,104 @@ export class OrderService {
   async update(id: number, dto: UpdateOrderDto) {
     const { status, items, customerId, note } = dto;
 
-    return this.prisma.$transaction(async (tx) => {
-      const updateData: any = {};
-      if (status) updateData.status = status;
-      if (customerId !== undefined) updateData.customerId = customerId;
-      if (note !== undefined) updateData.note = note || null;
+    return this.prisma.$transaction(
+      async (tx) => {
+        const updateData: any = {};
+        if (status) updateData.status = status;
+        if (customerId !== undefined) updateData.customerId = customerId;
+        if (note !== undefined) updateData.note = note || null;
 
-      const order = await tx.order.update({
-        where: { id },
-        data: updateData,
-      });
+        const order = await tx.order.update({
+          where: { id },
+          data: updateData,
+        });
 
-      if (items && items.length > 0) {
-        for (const item of items) {
-          await tx.orderItem.updateMany({
-            where: {
-              orderId: id,
-              productId: item.productId,
-            },
+        if (items && items.length > 0) {
+          for (const item of items) {
+            await tx.orderItem.updateMany({
+              where: {
+                orderId: id,
+                productId: item.productId,
+              },
+              data: {
+                price: item.price,
+                deposit: item.deposit,
+              },
+            });
+          }
+        }
+
+        // Đồng bộ trạng thái của sản phẩm dựa trên trạng thái đơn hàng
+        const currentItems = await tx.orderItem.findMany({
+          where: { orderId: id },
+        });
+
+        const orderStatus = order.status;
+
+        for (const item of currentItems) {
+          let productStatus: 'AVAILABLE' | 'DEPOSIT' | 'SOLD' = 'AVAILABLE';
+          if (orderStatus === 'COMPLETED') {
+            productStatus = 'SOLD';
+          } else if (orderStatus === 'DEPOSIT') {
+            productStatus = Number(item.deposit) >= Number(item.price) ? 'SOLD' : 'DEPOSIT';
+          } else if (orderStatus === 'CANCELLED') {
+            productStatus = 'AVAILABLE';
+          }
+
+          await tx.product.update({
+            where: { id: item.productId },
             data: {
-              price: item.price,
-              deposit: item.deposit,
+              status: productStatus,
+              ...(orderStatus !== 'CANCELLED' ? { price: item.price } : {}),
             },
           });
         }
-      }
 
-      // Đồng bộ trạng thái của sản phẩm dựa trên trạng thái đơn hàng
-      const currentItems = await tx.orderItem.findMany({
-        where: { orderId: id },
-      });
-
-      const orderStatus = order.status;
-
-      for (const item of currentItems) {
-        let productStatus: 'AVAILABLE' | 'DEPOSIT' | 'SOLD' = 'AVAILABLE';
-        if (orderStatus === 'COMPLETED') {
-          productStatus = 'SOLD';
-        } else if (orderStatus === 'DEPOSIT') {
-          productStatus = Number(item.deposit) >= Number(item.price) ? 'SOLD' : 'DEPOSIT';
-        } else if (orderStatus === 'CANCELLED') {
-          productStatus = 'AVAILABLE';
-        }
-
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            status: productStatus,
-            ...(orderStatus !== 'CANCELLED' ? { price: item.price } : {}),
+        return tx.order.findUnique({
+          where: { id },
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+            customer: true,
           },
         });
-      }
-
-      return tx.order.findUnique({
-        where: { id },
-        include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
-          customer: true,
-        },
-      });
-    });
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      },
+    );
   }
 
   async remove(id: number) {
-    return this.prisma.$transaction(async (tx) => {
-      const items = await tx.orderItem.findMany({
-        where: { orderId: id },
-      });
-
-      for (const item of items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { status: 'AVAILABLE' },
+    return this.prisma.$transaction(
+      async (tx) => {
+        const items = await tx.orderItem.findMany({
+          where: { orderId: id },
         });
-      }
 
-      await tx.orderItem.deleteMany({
-        where: { orderId: id },
-      });
+        for (const item of items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { status: 'AVAILABLE' },
+          });
+        }
 
-      return tx.order.delete({
-        where: { id },
-      });
-    });
+        await tx.orderItem.deleteMany({
+          where: { orderId: id },
+        });
+
+        return tx.order.delete({
+          where: { id },
+        });
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      },
+    );
   }
 }
